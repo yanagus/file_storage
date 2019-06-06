@@ -1,8 +1,10 @@
 <h5>Add file</h5>
-<div>
+
+<div class="form-group mt-3">
     <form method="post" enctype="multipart/form-data">
         <input type="file" name="file">
-        <input type="hidden" name="id" value="<#if file??>${file.id}</#if>" />
-        <button class="btn btn-primary" type="submit">Add</button>
+        <input type="hidden" name="_csrf" value="${_csrf.token}" />
+        <button class="btn btn-primary" type="submit">Add file</button>
     </form>
 </div>
+

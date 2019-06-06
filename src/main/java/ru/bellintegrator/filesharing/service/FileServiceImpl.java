@@ -8,8 +8,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
+import ru.bellintegrator.filesharing.exception.AccessException;
 import ru.bellintegrator.filesharing.exception.NotFoundException;
+import ru.bellintegrator.filesharing.model.Access;
+import ru.bellintegrator.filesharing.model.User;
 import ru.bellintegrator.filesharing.model.UserFile;
+import ru.bellintegrator.filesharing.repository.AccessRepository;
 import ru.bellintegrator.filesharing.repository.UserFileRepository;
 
 import javax.persistence.EntityNotFoundException;
@@ -31,10 +35,12 @@ public class FileServiceImpl implements FileService {
     private String uploadPath;
 
     private final UserFileRepository fileRepository;
+    private final AccessRepository accessRepository;
 
     @Autowired
-    public FileServiceImpl(UserFileRepository fileRepository) {
+    public FileServiceImpl(UserFileRepository fileRepository, AccessRepository accessRepository) {
         this.fileRepository = fileRepository;
+        this.accessRepository = accessRepository;
     }
 
     /**
@@ -51,7 +57,7 @@ public class FileServiceImpl implements FileService {
      */
     @Transactional
     @Override
-    public void uploadFile(MultipartFile file) {
+    public void uploadFile(User currentUser, MultipartFile file) {
         if (file == null || StringUtils.isEmpty(file.getOriginalFilename())) {
             throw new NotFoundException("Select file!");
         }
@@ -72,6 +78,7 @@ public class FileServiceImpl implements FileService {
         UserFile userFile = new UserFile();
         userFile.setOriginalName(file.getOriginalFilename());
         userFile.setFileName(resultFilename);
+        userFile.setUser(currentUser);
         userFile.setDownloadCount(0);
         fileRepository.save(userFile);
     }
@@ -81,19 +88,24 @@ public class FileServiceImpl implements FileService {
      */
     @Transactional
     @Override
-    public Resource downloadFile(String fileId) {
+    public Resource downloadFile(User currentUser, String fileId) {
         Integer id = transformStringIdToInteger(fileId);
         UserFile userFile = fileRepository.getOne(id);
         try {
-            Path rootLocation = Paths.get(uploadPath);
-            Path file = rootLocation.resolve(userFile.getFileName());
-            Resource resource = new UrlResource(file.toUri());
-            if (!resource.exists() || !resource.isReadable()) {
-                throw new NotFoundException("Could not read file: " + userFile.getFileName());
+            Access access = accessRepository.findByUserAndSubscriber(userFile.getUser(), currentUser);
+            if (isFileOwner(currentUser, userFile.getUser()) || (access != null
+                    && !access.getDownloadRequest() && access.getDownloadAccess())) {
+                Path rootLocation = Paths.get(uploadPath);
+                Path file = rootLocation.resolve(userFile.getFileName());
+                Resource resource = new UrlResource(file.toUri());
+                if (!resource.exists() || !resource.isReadable()) {
+                    throw new NotFoundException("Could not read file: " + userFile.getFileName());
+                }
+                userFile.setDownloadCount(userFile.getDownloadCount() + 1);
+                fileRepository.save(userFile);
+                return resource;
             }
-            userFile.setDownloadCount(userFile.getDownloadCount() + 1);
-            fileRepository.save(userFile);
-            return resource;
+            else throw new AccessException("You need permission to perform this action!");
         }
         catch (MalformedURLException e) {
             throw new NotFoundException("Could not read file: " + userFile.getFileName(), e);
@@ -108,10 +120,13 @@ public class FileServiceImpl implements FileService {
      */
     @Transactional
     @Override
-    public void deleteFile(String fileId) {
+    public void deleteFile(User currentUser, String fileId) {
         Integer id = transformStringIdToInteger(fileId);
         try {
             UserFile userFile = fileRepository.getOne(id);
+            if (!isFileOwner(currentUser, userFile.getUser())) {
+                throw new AccessException("You can not delete not your file!");
+            }
             File fileFromDisk = new File(uploadPath + "/" + userFile.getFileName());
             if (!fileFromDisk.delete()) {
                 throw new NotFoundException("The file was not deleted!");
@@ -133,10 +148,26 @@ public class FileServiceImpl implements FileService {
         return uuidFile + "." + originalFileName;
     }
 
+    /**
+     * Меняет тип id со String на Integer
+     * @param fileId id файла
+     * @return Integer
+     */
     private Integer transformStringIdToInteger(String fileId) {
         if (fileId == null || !fileId.matches("[\\d]+")) {
             throw new NotFoundException("The file id must not be null or character!");
         }
         return Integer.valueOf(fileId);
+    }
+
+    /**
+     * Определяет является ли текущий пользователь владельцем файлов
+     *
+     * @param currentUser текущий пользователь
+     * @param fileOwner владелец файлов
+     * @return true, если пользователь один и тот же
+     */
+    private boolean isFileOwner(User currentUser, User fileOwner) {
+        return currentUser.getId().equals(fileOwner.getId());
     }
 }
