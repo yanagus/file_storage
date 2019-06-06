@@ -1,8 +1,8 @@
 <#import "parts/common.ftl" as c>
+<#import "parts/login.ftl" as l>
 
 <@c.page>
 
-<#include "parts/addFile.ftl" />
-<#include "parts/fileList.ftl" />
+    <#include "parts/fileList.ftl" />
 
 </@c.page>

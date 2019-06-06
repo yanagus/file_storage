@@ -20,8 +20,39 @@ public class ApplicationExceptionHandler {
     @ExceptionHandler(NotFoundException.class)
     @ResponseStatus(HttpStatus.NOT_FOUND)
     public ModelAndView handleWeatherException(NotFoundException e) {
+        return createModelAndView(e);
+    }
+
+    /**
+     * Обработчик ошибок прав доступа
+     * @param e ошибка
+     * @return страница с текстом ошибки
+     */
+    @ExceptionHandler(AccessException.class)
+    @ResponseStatus(HttpStatus.FORBIDDEN)
+    public ModelAndView handleAccessException(AccessException e) {
+        return createModelAndView(e);
+    }
+
+    /**
+     * Обработчик ошибок о существующей сущности
+     * @param e ошибка
+     * @return страница с текстом ошибки
+     */
+    @ExceptionHandler(AlreadyExistException.class)
+    @ResponseStatus(HttpStatus.BAD_REQUEST)
+    public ModelAndView handleAlreadyExistException(AlreadyExistException e) {
+        return createModelAndView(e);
+    }
+
+    /**
+     * Создать страницу с текстом ошибки
+     * @param throwable перехватываемое исключение
+     * @return страница с текстом ошибки
+     */
+    private ModelAndView createModelAndView(Throwable throwable) {
         ModelAndView mav = new ModelAndView();
-        mav.addObject("error", e.getMessage());
+        mav.addObject("error", throwable.getMessage());
         mav.setViewName("error");
         return mav;
     }

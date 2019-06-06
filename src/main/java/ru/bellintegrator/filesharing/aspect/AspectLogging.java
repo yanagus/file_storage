@@ -20,9 +20,9 @@ public class AspectLogging {
     private final Logger log = LoggerFactory.getLogger(AspectLogging.class);
 
     /**
-     * Набор точек соединения - методы класса FileServiceImpl
+     * Набор точек соединения - методы пакета service
      */
-    @Pointcut("execution(* ru.bellintegrator.filesharing.service.FileServiceImpl.*(..))")
+    @Pointcut("execution(* ru.bellintegrator.filesharing.service.*.*(..))")
     public void selectAllMethodsAvaliable() {
 
     }
